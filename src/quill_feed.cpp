@@ -60,7 +60,7 @@ unsigned long& last_top_limit_debounce_time = _last_top_limit_debounce_time;
 // POTS INIT
 int quill_pot_pin = A0;
 int quill_pot_reading;
-int quill_pot_min_delta = 20;
+int quill_pot_min_delta = 50;
 
 // POLLING INPUT TIMES
 
@@ -69,17 +69,15 @@ const unsigned int switches_poll_delay = 100;
 unsigned int switches_last_poll = 0;
 
 // pots
-const unsigned int pots_poll_delay = 200;
+const unsigned int pots_poll_delay = 500;
 unsigned int pots_last_poll = 0;
 
 
 // LCD SETUP
 LiquidCrystal lcd(22, 23, 24, 25, 26, 27);
-const unsigned int lcd_out_delay = 100;
-unsigned int _last_lcd_downdate = 0;
 
 const float seconds_per_min = 60.0;
-const float steps_per_rev = 200.0;
+const float steps_per_rev = 400.0;
 
 
 
@@ -104,6 +102,9 @@ void setup()
     pinMode(toggle_down_pin, INPUT_PULLUP);
     pinMode(bottom_limit_pin, INPUT_PULLUP);
     pinMode(top_limit_pin, INPUT_PULLUP);
+
+    // INITIAL LIMIT CONTACT CHECKS
+    check_switches();
 
     // LCD SETUP
     lcd.begin(16, 2);
@@ -159,7 +160,7 @@ bool check_pots() {
     // [((x ** 3) / 1000000) + 1 for x in range(1, 1024)]
 
     float x = (pow(float(quill_pot_new_reading), 3) / 1000000) + 1;
-
+    x = x * 2;
     int adjusted_quill_speed_reading = floor(x);
     // Serial.print("Adjusted speed reading: ");
     // Serial.println(adjusted_quill_speed_reading);
@@ -291,17 +292,20 @@ void loop()
     if (now - switches_last_poll > switches_poll_delay) {
         if (check_switches()) {
             update_quill_stepper = true;
-        }   
+        }
         switches_last_poll = now;
     }
 
     // Pol Pot
-    if (now - pots_last_poll > pots_poll_delay) {
-        if (check_pots()) {
-            // Serial.println("pot changed!");
-            update_quill_stepper = true;
+    if (direction == DIRECTION_HOLD) {
+        if (now - pots_last_poll > pots_poll_delay) {
+            bool pots_changed = check_pots();
+            if (pots_changed) {
+                // Serial.println("pot changed!");
+                update_quill_stepper = true;
+            }
+            pots_last_poll = now;
         }
-        pots_last_poll = now;
     }
 
     if (update_quill_stepper) {
